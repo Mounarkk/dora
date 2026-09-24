@@ -1,0 +1,138 @@
+diff --git a/pupil_src/shared_modules/surface_tracker/surface.py b/pupil_src/shared_modules/surface_tracker/surface.py
+index 9e68d7d4..6f9d41f9 100644
+--- a/pupil_src/shared_modules/surface_tracker/surface.py
++++ b/pupil_src/shared_modules/surface_tracker/surface.py
+@@ -231,7 +231,7 @@ class Surface(abc.ABC):
+     def map_gaze_and_fixation_events(self, events, camera_model, trans_matrix=None):
+         """
+         Map a list of gaze or fixation events onto the surface and return the
+-        corresponding list of gaze/fixation on surface events.
++        corresponding list of gaze/fixation events.
+ 
+         Args:
+             events: List of gaze or fixation events.
+diff --git a/pupil_src/shared_modules/surface_tracker/surface_tracker.py b/pupil_src/shared_modules/surface_tracker/surface_tracker.py
+index 8206bfb9..c2cf355f 100644
+--- a/pupil_src/shared_modules/surface_tracker/surface_tracker.py
++++ b/pupil_src/shared_modules/surface_tracker/surface_tracker.py
+@@ -13,6 +13,7 @@ import typing as T
+ from abc import ABCMeta, abstractmethod
+ 
+ import numpy as np
++from accuracy_visualizer import Accuracy_Visualizer
+ from hotkey import Hotkey
+ from plugin import Plugin
+ from pyglui import ui
+@@ -52,6 +53,18 @@ class Surface_Tracker(Plugin, metaclass=ABCMeta):
+     def parse_pretty_class_name(cls) -> str:
+         return "Surface Tracker"
+ 
++    def add_surface(self, surface):
++        self.surfaces.append(surface)
++        self.gui.add_surface(surface)
++        self._update_ui()
++
++    def remove_surface(self, surface):
++        self.gui.remove_surface(surface)
++        self.surfaces.remove(surface)
++        self._update_ui()
++        self.save_surface_definitions_to_file()
++
++
+     def __init__(
+         self,
+         g_pool,
+@@ -465,6 +478,7 @@ class Surface_Tracker(Plugin, metaclass=ABCMeta):
+     def _create_surface_events(self, events, timestamp):
+         """
+         Adds surface events to the current list of events.
++        Includes accuracy and precision metrics from Accuracy_Visualizer.
+ 
+         Args:
+             events: Current list of events.
+@@ -473,6 +487,18 @@ class Surface_Tracker(Plugin, metaclass=ABCMeta):
+         gaze_events = events.get("gaze", [])
+         fixation_events = events.get("fixations", [])
+ 
++        # Get accuracy and precision from Accuracy_Visualizer if available
++        accuracy = -1
++        precision = -1
++        for plugin in self.g_pool.plugins:
++            if isinstance(plugin, Accuracy_Visualizer):
++                if plugin.accuracy is not None:
++                    accuracy = float(plugin.accuracy.result)
++
++                if plugin.precision is not None:
++                    precision = float(plugin.precision.result)         
++                break
++
+         surface_events = []
+         for surface in self.surfaces:
+             if surface.detected:
+@@ -482,7 +508,6 @@ class Surface_Tracker(Plugin, metaclass=ABCMeta):
+                 fixations_on_surf = surface.map_gaze_and_fixation_events(
+                     fixation_events, self.camera_model
+                 )
+-
+                 surface_event = {
+                     "topic": f"surfaces.{surface.name}",
+                     "name": surface.name,
+@@ -493,11 +518,27 @@ class Surface_Tracker(Plugin, metaclass=ABCMeta):
+                     "gaze_on_surfaces": gaze_on_surf,
+                     "fixations_on_surfaces": fixations_on_surf,
+                     "timestamp": timestamp,
++                    "number_of_tags": len(self.markers),
++                    "number_of_needed_tags": len(surface.registered_markers_dist),
++                    "list_of_markers": [self._marker_to_dict(m) for m in self.markers],
++                    "accuracy": accuracy,  
++                    "precision": precision,  
+                 }
+                 surface_events.append(surface_event)
+ 
+         return surface_events
+ 
++    def _marker_to_dict(self, marker):
++        """Convert a marker object to a serializable dictionary"""
++        marker_dict = {
++            'id': marker.tag_id,
++            'perimeter': float(marker.perimeter),
++            'centroid': list(marker.centroid()),  
++            'confidence': float(marker.id_confidence),
++        }
++        
++        
++        return marker_dict
+     @abstractmethod
+     def _update_surface_heatmaps(self):
+         pass
+@@ -512,17 +553,6 @@ class Surface_Tracker(Plugin, metaclass=ABCMeta):
+         else:
+             logger.warning("Can not add a new surface: No markers found in the image!")
+ 
+-    def add_surface(self, surface):
+-        self.surfaces.append(surface)
+-        self.gui.add_surface(surface)
+-        self._update_ui()
+-
+-    def remove_surface(self, surface):
+-        self.gui.remove_surface(surface)
+-        self.surfaces.remove(surface)
+-        self._update_ui()
+-        self.save_surface_definitions_to_file()
+-
+     def on_notify(self, notification):
+         if notification["subject"] == "surface_tracker.surfaces_changed":
+             logger.info("Surfaces changed. Saving to file.")
+diff --git a/pupil_src/shared_modules/version_utils.py b/pupil_src/shared_modules/version_utils.py
+index ece0cf29..07b91ecf 100644
+--- a/pupil_src/shared_modules/version_utils.py
++++ b/pupil_src/shared_modules/version_utils.py
+@@ -35,7 +35,7 @@ def get_tag_commit() -> T.Optional[str]:
+         return None
+ 
+ 
+-ParsedVersion = T.Union[packaging.version.Version]
++ParsedVersion = T.Union[packaging.version.LegacyVersion, packaging.version.Version]
+ 
+ 
+ def parse_version(vstring: str) -> ParsedVersion:

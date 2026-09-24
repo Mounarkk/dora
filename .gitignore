@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------------
+# Unity
+# ---------------------------------------------------------------------------
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Never ignore .meta files: Unity resolves asset references through the GUIDs
+# they carry. A tracked asset with an untracked .meta breaks on a fresh clone.
+!*.meta
+
+# Generated IDE / solution files
+*.csproj
+*.sln
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+.vs/
+.idea/
+.vscode/
+
+# Asset importer / crash artifacts
+sysinfo.txt
+*.stackdump
+crashlytics-build.properties
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# ---------------------------------------------------------------------------
+# Third-party binaries and asset packs — NOT redistributed here.
+# See "Setup" in README.md for the exact versions and download locations.
+# ---------------------------------------------------------------------------
+
+# OpenTrack 2024.1.1 Windows build (~428 MB of Qt/OpenCV DLLs)
+/OpenTrack/
+
+# Pupil Core 3.6.20 upstream source (~46 MB).
+# Our own plugin and capture settings live in tools/ and stay tracked.
+/pupil/
+
+# Unity HDRI Pack — several .exr files exceed GitHub's 100 MB hard limit
+/Assets/Resources/Skyboxes/UnityTechnologies/
+
+# Yughues Free Metal Materials (~569 MB of .tga textures)
+/Assets/Resources/Materials/YughuesFreeMetalMaterials/
+
+# ---------------------------------------------------------------------------
+# Generated documentation
+# ---------------------------------------------------------------------------
+# Doxygen HTML output — regenerate with `doxygen Doxyfile` in Documentation/
+/Documentation/html/
+/Documentation/latex/
+/_site/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.bbl
+*.blg
+
+# ---------------------------------------------------------------------------
+# Python / OS
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+desktop.ini

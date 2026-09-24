@@ -1,0 +1,69 @@
+#pragma kernel CSMain
+
+RWStructuredBuffer<int> CounterBuffer;
+Texture2D<float4> SegmentationTexture;
+
+// Color lookup data - each entry contains: R, G, B, ObjectID
+StructuredBuffer<float4> ColorToIdLookup;
+int LookupSize;
+
+float2 Center;
+float Radius;
+int TextureWidth;
+int TextureHeight;
+int2 BoundingBoxMin;
+
+// Function to find object ID from color using lookup table
+int FindObjectID(float3 pixelColor) {
+    // Convert to 8-bit values for comparison
+    int3 pixelRGB = int3(
+        round(pixelColor.r * 255.0),
+        round(pixelColor.g * 255.0),
+        round(pixelColor.b * 255.0)
+    );
+    
+    // Search through lookup table
+    for (int i = 0; i < LookupSize; i++) {
+        float4 entry = ColorToIdLookup[i];
+        int3 entryRGB = int3(
+            round(entry.r * 255.0),
+            round(entry.g * 255.0),
+            round(entry.b * 255.0)
+        );
+        
+        // Check if colors match (with small tolerance for floating point errors)
+        if (abs(pixelRGB.r - entryRGB.r) <= 1 && 
+            abs(pixelRGB.g - entryRGB.g) <= 1 && 
+            abs(pixelRGB.b - entryRGB.b) <= 1) {
+            return (int)entry.w;  // Return ObjectID
+        }
+    }
+    return 0; // No match found
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // Convert dispatch coordinates to actual pixel coordinates
+    int2 pixelCoord = BoundingBoxMin + int2(id.x, id.y);
+    
+    // Check bounds
+    if (pixelCoord.x < 0 || pixelCoord.x >= TextureWidth || 
+        pixelCoord.y < 0 || pixelCoord.y >= TextureHeight) 
+        return;
+    
+    // Check if pixel is inside circle
+    float2 centerOffset = pixelCoord - Center;
+    if (dot(centerOffset, centerOffset) > Radius * Radius) 
+        return;
+
+    // Sample pixel color
+    float4 pixel = SegmentationTexture.Load(int3(pixelCoord, 0));
+    
+    // Find object ID using lookup table
+    int objectID = FindObjectID(pixel.rgb);
+    
+    if (objectID > 0) {
+        InterlockedAdd(CounterBuffer[objectID], 1);
+    }
+}

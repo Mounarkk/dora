@@ -1,0 +1,51 @@
+#pragma kernel CSMain
+Texture2D<float> _CameraDepthTexture;
+SamplerState sampler_CameraDepthTexture;
+
+RWStructuredBuffer<int> MinMaxBuffer; // [0] = encodedMin, [1] = encodedMax
+
+cbuffer Params {
+    int2 regionOffset;
+    int2 regionSize;
+    float nearPlane;
+    float farPlane;
+    float4 _MyZBufferParams; 
+};
+
+// Float encoding for atomic ops
+int FloatToOrderedInt(float f) {
+    int i = asint(f);
+    return (i >= 0) ? i : (0x80000000 - i);
+}
+
+float OrderedIntToFloat(int i) {
+    return asfloat((i >= 0) ? i : (0x80000000 - i));
+}
+
+// Custom linear depth calculation
+float MyLinearEyeDepth(float z, float4 params) {
+    return 1.0 / (params.z * z + params.w);
+}
+
+[numthreads(32,32,1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)regionSize.x || id.y >= (uint)regionSize.y)
+        return;
+
+    int2 samplePos = regionOffset + int2(id.x, id.y);
+
+    // Sample depth texture
+    float rawDepth = _CameraDepthTexture.Load(int3(samplePos, 0));
+    
+    // Convert to linear depth using custom function
+    float linearDepth = MyLinearEyeDepth(rawDepth, _MyZBufferParams);
+
+    // Update min/max only for foreground pixels
+    if (linearDepth < farPlane) // Ignore background
+    {
+        int encoded = FloatToOrderedInt(linearDepth);
+        InterlockedMin(MinMaxBuffer[0], encoded); // encoded min
+        InterlockedMax(MinMaxBuffer[1], encoded); // encoded max
+    }
+}
